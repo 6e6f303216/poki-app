@@ -39,11 +39,11 @@ jobs:
           npx cap init "Poki" "com.mimute.poki" --web-dir www
           npx cap add android
 
-          # Нарезка иконки через предустановленный ffmpeg
+          # Ресайз иконки до 1024x1024 через Python Pillow
           if [ -f icon.png ]; then
+            pip install pillow
             mkdir -p assets
-            ffmpeg -y -i icon.png -vf scale=1024:1024 assets/icon-only.png
-            cp assets/icon-only.png assets/icon-foreground.png
+            python3 -c "from PIL import Image; im = Image.open('icon.png').convert('RGBA').resize((1024, 1024)); im.save('assets/icon-only.png'); im.save('assets/icon-foreground.png')"
             npx @capacitor/assets generate --android || true
           fi
 
