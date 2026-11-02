@@ -43,7 +43,6 @@
       user-select: none;
     }
 
-    /* Поддержка системных отступов Android/iOS */
     .safe-top {
       padding-top: env(safe-area-inset-top, 0px);
     }
@@ -105,7 +104,7 @@
                 </span>
               </div>
               <!-- Статус соединения с биржей/сервером -->
-              <div id="connectionStatusBadge" class="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-900/60 text-slate-300 backdrop-blur-md flex items-center gap-1.5">
+              <div id="connectionStatusBadge" class="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-900/60 text-slate-300 backdrop-blur-md flex items-center gap-1.5 cursor-pointer" onclick="switchTab('settings')">
                 <span id="connectionDot" class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
                 <span id="sbmmPriceLabel">SBMM: ...</span>
               </div>
@@ -174,7 +173,7 @@
       <section id="view-settings" class="hidden px-5 py-6 space-y-4 safe-top">
         <div>
           <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100 mb-0.5">Настройки</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Параметры цели и оформление</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Параметры цели, оформление и отладка</p>
         </div>
 
         <!-- Параметры цели -->
@@ -191,6 +190,22 @@
           <button onclick="openEditGoalModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm active:scale-95 transition-all flex items-center gap-1.5" style="background: var(--accent);">
             <i class="fa-solid fa-sliders"></i>
             <span id="settingsGoalBtnText">Настроить</span>
+          </button>
+        </div>
+
+        <!-- Баланс паев пользователя -->
+        <div class="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-sm font-bold">
+              <i class="fa-solid fa-wallet"></i>
+            </div>
+            <div>
+              <p class="font-semibold text-sm">Мои паи SBMM</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400" id="settingsSharesCount">0 шт.</p>
+            </div>
+          </div>
+          <button onclick="resetShares()" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 active:scale-95 transition-all">
+            Сбросить
           </button>
         </div>
 
@@ -257,6 +272,31 @@
           </div>
           <div class="text-xs text-slate-400 font-mono text-right" id="hexCodeLabel">#10B981</div>
         </div>
+
+        <!-- ================= БЛОК ОТЛАДКИ И ЛОГОВ ================= -->
+        <div class="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-200 dark:bg-slate-700 text-xs text-slate-600 dark:text-slate-300">
+                <i class="fa-solid fa-terminal"></i>
+              </div>
+              <h3 class="font-semibold text-sm text-slate-900 dark:text-slate-100">Логи курса MOEX (WS)</h3>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="reconnectWebSocket()" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 active:scale-95 transition-all">
+                Реконнект
+              </button>
+              <button onclick="clearAppLogs()" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-500 bg-rose-500/10 active:scale-95 transition-all">
+                Очистить
+              </button>
+            </div>
+          </div>
+
+          <div id="debugLogsContainer" class="w-full h-44 bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-[11px] leading-relaxed overflow-y-auto whitespace-pre-wrap break-all border border-slate-800 select-text">
+[Система] Запуск отслеживания...
+          </div>
+        </div>
+
       </section>
 
     </main>
@@ -300,14 +340,14 @@
         <form onsubmit="handleTopUpSubmit(event)" class="space-y-4 pt-4">
           <div>
             <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
-              Паев
+              Количество паев
             </label>
-            <input
-              type="number"
-              id="topUpSharesInput"
-              step="any"
-              required
-              placeholder="0"
+            <input 
+              type="number" 
+              id="topUpSharesInput" 
+              step="any" 
+              required 
+              placeholder="0" 
               class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-lg font-bold outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-white"
             >
           </div>
@@ -418,6 +458,7 @@
       { id: 'violet', name: 'Неон', color: '#8B5CF6' },
     ];
 
+    // Все персональные данные (цель и количество паев) хранятся локально на каждом устройстве!
     let appState = {
       activeTab: 'goal',
       currentThemePreset: 'emerald',
@@ -425,9 +466,25 @@
       isDark: true,
       pendingImageDataUrl: null,
       shares: parseFloat(localStorage.getItem('poki_shares_total') || '0'),
-      sbmmPrice: parseFloat(localStorage.getItem('poki_sbmm_price') || '315.0'),
+      sbmmPrice: parseFloat(localStorage.getItem('poki_sbmm_price') || '20.0'),
       goal: loadSavedGoal()
     };
+
+    function appendLog(msg) {
+      console.log(msg);
+      const container = document.getElementById('debugLogsContainer');
+      if (!container) return;
+      const time = new Date().toLocaleTimeString('ru-RU');
+      container.textContent += `\n[${time}] ${msg}`;
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function clearAppLogs() {
+      const container = document.getElementById('debugLogsContainer');
+      if (container) {
+        container.textContent = '[Логи очищены]';
+      }
+    }
 
     function loadSavedGoal() {
       try {
@@ -447,44 +504,60 @@
       } catch (e) {}
     }
 
-    // ================= СЕТЕВОЕ ВЗАИМОДЕЙСТВИЕ (REST + WEBSOCKET) =================
+    // ================= WEBSOCKET ТОЛЬКО ДЛЯ КУРСА SBMM =================
     let wsInstance = null;
     let wsReconnectTimeout = null;
 
     function initWebSocket() {
       clearTimeout(wsReconnectTimeout);
       const wsUrl = `${CONFIG.WS_BASE}?token=${CONFIG.TOKEN}`;
+      appendLog(`Подключение к ${wsUrl}...`);
       
       try {
         wsInstance = new WebSocket(wsUrl);
 
         wsInstance.onopen = () => {
+          appendLog('✓ WS подключен (источник курса SBMM)');
           updateConnectionStatus(true);
         };
 
         wsInstance.onmessage = (event) => {
+          appendLog(`← Данные: ${event.data.slice(0, 100)}`);
           try {
             const data = JSON.parse(event.data);
-            handleServerUpdate(data);
+            handleServerPriceUpdate(data);
           } catch (e) {
-            console.error('Ошибка парсинга WS:', e);
+            const num = parseFloat(event.data);
+            if (!isNaN(num)) {
+              handleServerPriceUpdate({ price: num });
+            }
           }
         };
 
-        wsInstance.onclose = () => {
+        wsInstance.onclose = (ev) => {
+          appendLog(`✗ WS закрыт (код: ${ev.code})`);
           updateConnectionStatus(false);
-          // Автопереподключение через 4 сек при обрыве
           wsReconnectTimeout = setTimeout(initWebSocket, 4000);
         };
 
         wsInstance.onerror = () => {
+          appendLog('✗ Ошибка WebSocket соединения');
           updateConnectionStatus(false);
           try { wsInstance.close(); } catch(e) {}
         };
       } catch (e) {
+        appendLog(`✗ Исключение WS: ${e.message}`);
         updateConnectionStatus(false);
         wsReconnectTimeout = setTimeout(initWebSocket, 5000);
       }
+    }
+
+    function reconnectWebSocket() {
+      appendLog('Принудительный реконнект WS...');
+      if (wsInstance) {
+        try { wsInstance.close(); } catch(e) {}
+      }
+      initWebSocket();
     }
 
     function updateConnectionStatus(isOnline) {
@@ -497,37 +570,26 @@
       }
     }
 
-    function handleServerUpdate(data) {
-      if (data.price !== undefined) {
-        appState.sbmmPrice = Number(data.price);
+    // Сервер обновляет ТОЛЬКО цену пая. Никакие чужие паи и чужие цели сюда не лезут!
+    function handleServerPriceUpdate(data) {
+      const incomingPrice = data.price ?? data.sbmm_price ?? data.sbmm ?? data.cost ?? data.value ?? data.rate;
+      if (incomingPrice !== undefined && !isNaN(Number(incomingPrice)) && Number(incomingPrice) > 0) {
+        appState.sbmmPrice = Number(incomingPrice);
         localStorage.setItem('poki_sbmm_price', appState.sbmmPrice.toString());
         const label = document.getElementById('sbmmPriceLabel');
         if (label) label.textContent = `SBMM: ${appState.sbmmPrice.toFixed(2)} ₽`;
+        appendLog(`Актуальный курс SBMM: ${appState.sbmmPrice} ₽`);
       }
 
-      if (data.shares !== undefined) {
-        appState.shares = Number(data.shares);
-        localStorage.setItem('poki_shares_total', appState.shares.toString());
-        renderShares();
-      }
-
-      if (data.goal !== undefined && data.goal !== null) {
-        if (Object.keys(data.goal).length > 0) {
-          appState.goal = data.goal;
-          saveGoalToStorage();
-        }
-      }
-
-      // Пересчёт баланса цели: паи * актуальный курс SBMM
+      // Пересчитываем локальную цель от личных паев
       if (appState.goal) {
-        const calculatedBalance = Math.round(appState.shares * appState.sbmmPrice);
-        appState.goal.current = calculatedBalance;
+        appState.goal.current = Math.round(appState.shares * appState.sbmmPrice);
         saveGoalToStorage();
         renderGoal();
       }
     }
 
-    // ================= ПОПОЛНЕНИЕ =================
+    // ================= ПОПОЛНЕНИЕ (ЛОКАЛЬНО) =================
     function openTopUpModal() {
       const input = document.getElementById('topUpSharesInput');
       input.value = '';
@@ -549,19 +611,26 @@
       }, 200);
     }
 
-    async function handleTopUpSubmit(e) {
+    function handleTopUpSubmit(e) {
       e.preventDefault();
       const input = document.getElementById('topUpSharesInput');
       const val = parseFloat(input.value);
 
-      if (!val || val <= 0) {
+      // Разрешаем любое число, кроме нуля и NaN
+      if (!val || val === 0) {
         showToast('Введите количество паев', 'warning');
         return;
       }
 
-      // Оптимистичное локальное обновление
-      appState.shares += val;
+      // Защита, чтобы не уйти в минус ниже нуля
+      if (appState.shares + val < 0) {
+        showToast(`Нельзя списать больше, чем есть (${appState.shares} паев)`, 'warning');
+        return;
+      }
+
+      appState.shares = Math.max(0, appState.shares + val);
       localStorage.setItem('poki_shares_total', appState.shares.toString());
+
       if (appState.goal) {
         appState.goal.current = Math.round(appState.shares * appState.sbmmPrice);
         saveGoalToStorage();
@@ -571,31 +640,40 @@
       renderGoal();
       playCoinSound();
       closeTopUpModal();
-      showToast(`+${val.toLocaleString('ru-RU')} паев добавлено`);
+      
+      if (val > 0) {
+        showToast(`+${val.toLocaleString('ru-RU')} паев добавлено`);
+      } else {
+        showToast(`${val.toLocaleString('ru-RU')} паев списано`);
+      }
+    }
 
-      // Синхронизация с бэкендом
-      try {
-        await fetch(`${CONFIG.API_BASE}/api/topup`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-token': CONFIG.TOKEN
-          },
-          body: JSON.stringify({ shares: val })
-        });
-      } catch (err) {
-        console.warn('Сервер временно недоступен, данные сохранены локально.');
+    function resetShares() {
+      if (confirm('Сбросить количество накопленных паев на этом устройстве?')) {
+        appState.shares = 0;
+        localStorage.setItem('poki_shares_total', '0');
+        if (appState.goal) {
+          appState.goal.current = 0;
+          saveGoalToStorage();
+        }
+        renderShares();
+        renderGoal();
+        showToast('Баланс паев сброшен');
       }
     }
 
     function renderShares() {
-      const el = document.getElementById('sharesCountBadge');
-      if (el) {
-        el.textContent = `${appState.shares.toLocaleString('ru-RU')} паев`;
+      const label = document.getElementById('sbmmPriceLabel');
+      if (label && appState.sbmmPrice) {
+        label.textContent = `SBMM: ${appState.sbmmPrice.toFixed(2)} ₽`;
+      }
+      const sharesLabel = document.getElementById('settingsSharesCount');
+      if (sharesLabel) {
+        sharesLabel.textContent = `${appState.shares.toLocaleString('ru-RU')} шт. (${formatMoney(Math.round(appState.shares * appState.sbmmPrice))})`;
       }
     }
 
-    // ================= ЦЕЛЬ =================
+    // ================= ЦЕЛЬ (ЛОКАЛЬНО) =================
     function renderGoal() {
       const contentEl = document.getElementById('goalContentContainer');
       const emptyEl = document.getElementById('noGoalContainer');
@@ -622,7 +700,6 @@
       cardBtn.textContent = 'Настроить';
 
       const g = appState.goal;
-      // Сумма всегда рассчитывается от реальной стоимости паев
       const current = Math.round(appState.shares * appState.sbmmPrice);
       g.current = current;
 
@@ -735,7 +812,7 @@
       document.getElementById('goalImageInput').click();
     });
 
-    async function handleSaveGoalSettings(e) {
+    function handleSaveGoalSettings(e) {
       e.preventDefault();
       const title = document.getElementById('editGoalTitleInput').value.trim();
       const target = parseFloat(document.getElementById('editGoalTargetInput').value);
@@ -759,35 +836,14 @@
       renderGoal();
       closeEditGoalModal();
       showToast(isNew ? 'Цель создана!' : 'Параметры цели обновлены');
-
-      // Отправка на бэкенд
-      try {
-        await fetch(`${CONFIG.API_BASE}/api/goal`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-token': CONFIG.TOKEN
-          },
-          body: JSON.stringify(appState.goal)
-        });
-      } catch (err) {
-        console.warn('Сервер недоступен, цель сохранена локально.');
-      }
     }
 
-    async function deleteGoal() {
+    function deleteGoal() {
       if (confirm('Удалить текущую цель?')) {
         appState.goal = null;
         saveGoalToStorage();
         renderGoal();
         showToast('Цель удалена');
-
-        try {
-          await fetch(`${CONFIG.API_BASE}/api/goal`, {
-            method: 'DELETE',
-            headers: { 'x-token': CONFIG.TOKEN }
-          });
-        } catch (err) {}
       }
     }
 
@@ -900,63 +956,6 @@
         osc.start();
         osc.stop(ctx.currentTime + 0.35);
       } catch (e) {}
-    }
-
-    function triggerConfetti() {
-      const canvas = document.getElementById('confettiCanvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-
-      const particles = [];
-      const colors = [appState.customAccent, '#F59E0B', '#EF4444', '#3B82F6', '#10B981'];
-
-      for (let i = 0; i < 80; i++) {
-        particles.push({
-          x: canvas.width / 2,
-          y: canvas.height * 0.4,
-          r: Math.random() * 6 + 4,
-          dx: (Math.random() - 0.5) * 12,
-          dy: (Math.random() - 0.7) * 16,
-          color: colors[Math.floor(Math.random() * colors.length)],
-          tilt: Math.random() * 10,
-          tiltAngle: 0,
-          tiltAngleInc: Math.random() * 0.07 + 0.05,
-          opacity: 1
-        });
-      }
-
-      function render() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        let alive = false;
-
-        particles.forEach(p => {
-          p.x += p.dx;
-          p.y += p.dy;
-          p.dy += 0.35;
-          p.tiltAngle += p.tiltAngleInc;
-          p.tilt = Math.sin(p.tiltAngle) * 12;
-          p.opacity -= 0.012;
-
-          if (p.opacity > 0 && p.y < canvas.height + 20) {
-            alive = true;
-            ctx.beginPath();
-            ctx.lineWidth = p.r / 2;
-            ctx.strokeStyle = p.color;
-            ctx.globalAlpha = Math.max(0, p.opacity);
-            ctx.moveTo(p.x + p.tilt + p.r / 4, p.y);
-            ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 4);
-            ctx.stroke();
-          }
-        });
-
-        if (alive) {
-          requestAnimationFrame(render);
-        } else {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-      }
-      render();
     }
 
     function formatMoney(num) {
