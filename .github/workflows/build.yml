@@ -1,0 +1,21 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: |
+          npm i -g @capacitor/cli @capacitor/core @capacitor/assets
+          npm init -y
+          npx cap init "App" "com.example.app" --web-dir .
+          npx cap add android
+          mkdir -p assets && cp icon.png assets/icon.png
+          npx @capacitor/assets generate --android
+          cd android && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
