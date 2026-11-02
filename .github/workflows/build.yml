@@ -18,7 +18,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Prepare Web Assets
         run: |
@@ -39,11 +39,19 @@ jobs:
           npx cap init "Poki" "com.mimute.poki" --web-dir www
           npx cap add android
 
-          # Ресайз иконки до 1024x1024 через Python Pillow
+          # Генерация всех слоев иконки (передний план, фон и монолитная иконка)
           if [ -f icon.png ]; then
             pip install pillow
             mkdir -p assets
-            python3 -c "from PIL import Image; im = Image.open('icon.png').convert('RGBA').resize((1024, 1024)); im.save('assets/icon-only.png'); im.save('assets/icon-foreground.png')"
+            python3 -c "
+          from PIL import Image
+          im = Image.open('icon.png').convert('RGBA').resize((1024, 1024))
+          im.save('assets/icon-only.png')
+          im.save('assets/icon-foreground.png')
+          # Создаем темный фоновый слой под тему приложения (#0F172A)
+          bg = Image.new('RGBA', (1024, 1024), (15, 23, 42, 255))
+          bg.save('assets/icon-background.png')
+          "
             npx @capacitor/assets generate --android || true
           fi
 
