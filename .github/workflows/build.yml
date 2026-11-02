@@ -23,7 +23,6 @@ jobs:
       - name: Prepare Web Assets
         run: |
           mkdir -p www
-          # Копируем входной файл (Poki.html или index.html)
           if [ -f Poki.html ]; then
             cp Poki.html www/index.html
           elif [ -f index.html ]; then
@@ -37,27 +36,24 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/assets
           
-          # Инициализация с твоим package ID
           npx cap init "Poki" "com.mimute.poki" --web-dir www
           npx cap add android
 
-          # Генерация иконок
+          # Нарезка иконки через предустановленный ffmpeg
           if [ -f icon.png ]; then
             mkdir -p assets
-            convert icon.png -resize 1024x1024! assets/icon-only.png
+            ffmpeg -y -i icon.png -vf scale=1024:1024 assets/icon-only.png
             cp assets/icon-only.png assets/icon-foreground.png
             npx @capacitor/assets generate --android || true
           fi
 
-          # Разрешение сетевого трафика и фиксация портретной ориентации
+          # Сетевые права и портретная ориентация
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i 's/<application/<application android:usesCleartextTraffic="true"/' "$MANIFEST"
           sed -i 's/android:name=".MainActivity"/android:name=".MainActivity" android:screenOrientation="portrait"/' "$MANIFEST"
 
-          # Синхронизация ассетов в нативный проект
           npx cap sync android
 
-          # Сборка debug APK
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
